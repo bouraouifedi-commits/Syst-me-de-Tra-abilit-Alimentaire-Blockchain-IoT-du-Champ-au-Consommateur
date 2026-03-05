@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-1a30c68ff68337b0bb071f7e65df8a37f30d5a86",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Lock.sol": "project/contracts/Lock.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Lock.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.20;\r\n\r\ncontract Lock {\r\n    uint256 public unlockTime;\r\n    address payable public owner;\r\n\r\n    event Withdrawal(uint256 amount, uint256 when);\r\n\r\n    constructor(uint256 _unlockTime) payable {\r\n        require(_unlockTime > block.timestamp, \"unlockTime should be in the future\");\r\n        unlockTime = _unlockTime;\r\n        owner = payable(msg.sender);\r\n    }\r\n\r\n    function withdraw() external {\r\n        require(block.timestamp >= unlockTime, \"You can't withdraw yet\");\r\n        require(msg.sender == owner, \"You aren't the owner\");\r\n\r\n        uint256 amount = address(this).balance;\r\n        (bool ok, ) = owner.call{value: amount}(\"\");\r\n        require(ok, \"Transfer failed\");\r\n\r\n        emit Withdrawal(amount, block.timestamp);\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}

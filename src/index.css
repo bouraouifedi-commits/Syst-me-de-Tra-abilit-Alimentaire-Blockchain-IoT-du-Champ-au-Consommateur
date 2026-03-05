@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root { color-scheme: dark; }
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(99,102,241,.25), transparent),
+    radial-gradient(1200px 600px at 85% 10%, rgba(244,63,94,.20), transparent),
+    linear-gradient(180deg, #050814, #0b1220 55%, #060b16);
+}

@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-26a34f968b79c0ca2ffd6eaca849c3ba77713d32",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/Traceability.sol": "project/contracts/Traceability.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/Traceability.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n\r\ncontract Traceability {\r\n\r\n    string public productName;\r\n    address public owner;\r\n\r\n    constructor(string memory _productName) {\r\n        productName = _productName;\r\n        owner = msg.sender;\r\n    }\r\n\r\n    function updateProduct(string memory _newName) public {\r\n        require(msg.sender == owner, \"Not owner\");\r\n        productName = _newName;\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}

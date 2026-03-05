@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_28-c645c33de62121193e05af6e777f1816cbd31cca",
+  "solcVersion": "0.8.28",
+  "solcLongVersion": "0.8.28+commit.7893614a",
+  "userSourceNameMap": {
+    "contracts/ChahiaTraceability.sol": "project/contracts/ChahiaTraceability.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "cancun",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/ChahiaTraceability.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.28;\r\n\r\ncontract ChahiaTraceability {\r\n    // Rôles (V1)\r\n    enum Role { NONE, PRODUCER, PROCESSOR, TRANSPORTER, DISTRIBUTOR }\r\n\r\n    // Statuts (cycle de vie d'un lot)\r\n    enum Status { CREATED, PROCESSED, IN_TRANSIT, DELIVERED, FOR_SALE, SOLD }\r\n\r\n    struct TraceEvent {\r\n        uint256 timestamp;\r\n        address actor;\r\n        Status status;\r\n        string note;     // ex: \"Abattage + emballage\"\r\n        string ipfsCid;  // ex: CID d'un certificat (\"\" si vide)\r\n    }\r\n\r\n    struct Lot {\r\n        string lotId;          // ex: \"CHAHIA-POULET-2026-001\"\r\n        string productName;    // ex: \"Poulet\"\r\n        address owner;         // acteur actuel responsable\r\n        Status status;         // statut actuel\r\n        string[] documents;    // liste des CIDs IPFS\r\n        TraceEvent[] history;  // historique complet\r\n        bool exists;\r\n    }\r\n\r\n    // Qui a quel rôle ?\r\n    mapping(address => Role) public roles;\r\n\r\n    // Stockage des lots (clé = lotId)\r\n    mapping(string => Lot) private lots;\r\n\r\n    // Events pour suivre l'activité depuis l'explorer\r\n    event RoleGranted(address indexed user, Role role);\r\n    event LotCreated(string indexed lotId, string productName, address indexed owner);\r\n    event LotUpdated(string indexed lotId, Status status, address indexed actor, string note, string ipfsCid);\r\n    event DocumentAdded(string indexed lotId, string ipfsCid, address indexed actor);\r\n\r\n    modifier onlyRole(Role r) {\r\n        require(roles[msg.sender] == r, \"Not authorized\");\r\n        _;\r\n    }\r\n\r\n    modifier lotExists(string memory lotId) {\r\n        require(lots[lotId].exists, \"Lot not found\");\r\n        _;\r\n    }\r\n\r\n    constructor() {\r\n        // V1: le deployer devient \"PRODUCER\" (admin simple)\r\n        roles[msg.sender] = Role.PRODUCER;\r\n        emit RoleGranted(msg.sender, Role.PRODUCER);\r\n    }\r\n\r\n    // Admin simple (V1) : attribuer des rôles\r\n    function grantRole(address user, Role role) external onlyRole(Role.PRODUCER) {\r\n        roles[user] = role;\r\n        emit RoleGranted(user, role);\r\n    }\r\n\r\n    // 1) Création de lot (par producteur)\r\n    function createLot(string calldata lotId, string calldata productName, string calldata note)\r\n        external\r\n        onlyRole(Role.PRODUCER)\r\n    {\r\n        require(!lots[lotId].exists, \"Lot already exists\");\r\n\r\n        Lot storage L = lots[lotId];\r\n        L.lotId = lotId;\r\n        L.productName = productName;\r\n        L.owner = msg.sender;\r\n        L.status = Status.CREATED;\r\n        L.exists = true;\r\n\r\n        L.history.push(TraceEvent(block.timestamp, msg.sender, Status.CREATED, note, \"\"));\r\n\r\n        emit LotCreated(lotId, productName, msg.sender);\r\n        emit LotUpdated(lotId, Status.CREATED, msg.sender, note, \"\");\r\n    }\r\n\r\n    // 2) Ajouter document IPFS (certificat, analyse, etc.)\r\n    function addDocument(string calldata lotId, string calldata cid)\r\n        external\r\n        lotExists(lotId)\r\n    {\r\n        require(msg.sender == lots[lotId].owner || roles[msg.sender] != Role.NONE, \"Not allowed\");\r\n\r\n        lots[lotId].documents.push(cid);\r\n        emit DocumentAdded(lotId, cid, msg.sender);\r\n    }\r\n\r\n    // 3) Mise à jour statut selon rôle (règles V1)\r\n    function updateStatus(string calldata lotId, Status newStatus, string calldata note, string calldata cid)\r\n        external\r\n        lotExists(lotId)\r\n    {\r\n        if (newStatus == Status.PROCESSED) require(roles[msg.sender] == Role.PROCESSOR, \"Need PROCESSOR\");\r\n        if (newStatus == Status.IN_TRANSIT) require(roles[msg.sender] == Role.TRANSPORTER, \"Need TRANSPORTER\");\r\n        if (newStatus == Status.DELIVERED || newStatus == Status.FOR_SALE) require(roles[msg.sender] == Role.DISTRIBUTOR, \"Need DISTRIBUTOR\");\r\n\r\n        lots[lotId].status = newStatus;\r\n\r\n        lots[lotId].history.push(TraceEvent(block.timestamp, msg.sender, newStatus, note, cid));\r\n\r\n        if (bytes(cid).length > 0) {\r\n            lots[lotId].documents.push(cid);\r\n            emit DocumentAdded(lotId, cid, msg.sender);\r\n        }\r\n\r\n        emit LotUpdated(lotId, newStatus, msg.sender, note, cid);\r\n    }\r\n\r\n    // Lecture simple des infos lot\r\n    function getLot(string calldata lotId)\r\n        external\r\n        view\r\n        lotExists(lotId)\r\n        returns (string memory, string memory, address, Status, uint256, uint256)\r\n    {\r\n        Lot storage L = lots[lotId];\r\n        return (L.lotId, L.productName, L.owner, L.status, L.documents.length, L.history.length);\r\n    }\r\n\r\n    // Récupérer un CID par index\r\n    function getDocument(string calldata lotId, uint256 index)\r\n        external\r\n        view\r\n        lotExists(lotId)\r\n        returns (string memory)\r\n    {\r\n        return lots[lotId].documents[index];\r\n    }\r\n\r\n    // Récupérer un event d'historique par index\r\n    function getHistoryEvent(string calldata lotId, uint256 index)\r\n        external\r\n        view\r\n        lotExists(lotId)\r\n        returns (uint256, address, Status, string memory, string memory)\r\n    {\r\n        TraceEvent storage e = lots[lotId].history[index];\r\n        return (e.timestamp, e.actor, e.status, e.note, e.ipfsCid);\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}
